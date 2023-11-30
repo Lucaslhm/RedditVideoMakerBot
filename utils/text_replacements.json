@@ -1,0 +1,16 @@
+{
+    "__comment": "Input words to replace in the video",
+    "text-and-audio": [
+        ["fuck", "fork"],
+        ["shit", "poo"],
+        ["ass", "butt"],
+        ["asshole", "a-hole"]
+    ],
+    "text-only": [],
+    "audio-only": [
+        ["mic", "mike"],
+        ["tifu", "today I forked up"],
+        ["fml", "frick my life"],
+        ["aita", "am I the a-hole"]
+    ]
+}
