@@ -4,13 +4,19 @@
         ["fuck", "fork"],
         ["shit", "poo"],
         ["ass", "butt"],
-        ["asshole", "a-hole"]
+        ["asshole", "'a'-hole"],
+        ["fucked", "forked"]
     ],
     "text-only": [],
     "audio-only": [
         ["mic", "mike"],
         ["tifu", "today I forked up"],
         ["fml", "frick my life"],
-        ["aita", "am I the a-hole"]
+        ["aita", "am I the 'a'-hole"],
+        ["NTA", "not the 'a'-hole"],
+        ["YTA", "you're an 'a'-hole"],
+        ["NAH", "No 'a'-holes here"],
+        ["ESH", "Everybody's poo here"]
+
     ]
 }
