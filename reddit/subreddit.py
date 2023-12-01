@@ -124,12 +124,16 @@ def get_subreddit_threads(POST_ID: str):
     content["thread_id"] = submission.id
     content["is_nsfw"] = submission.over_18
     content["comments"] = []
+    max_comments_download = settings.config["reddit"]["thread"]["max_comments"]
     if settings.config["settings"]["storymode"]:
         if settings.config["settings"]["storymodemethod"] == 1:
             content["thread_post"] = posttextparser(submission.selftext)
         else:
             content["thread_post"] = submission.selftext
     else:
+        
+        comments_added = 0
+        
         for top_level_comment in submission.comments:
             if isinstance(top_level_comment, MoreComments):
                 continue
@@ -150,6 +154,12 @@ def get_subreddit_threads(POST_ID: str):
                             top_level_comment.author is not None
                             and sanitize_text(top_level_comment.body) is not None
                         ):  # if errors occur with this change to if not.
+                            
+                            
+                            if max_comments_download != -1 and comments_added >= max_comments_download:
+                                break  # Break the loop if the max limit is reached
+
+                            
                             content["comments"].append(
                                 {
                                     "comment_body": top_level_comment.body,
@@ -157,6 +167,8 @@ def get_subreddit_threads(POST_ID: str):
                                     "comment_id": top_level_comment.id,
                                 }
                             )
+                            
+                            comments_added += 1
 
     print_substep("Received subreddit threads Successfully.", style="bold green")
     return content
