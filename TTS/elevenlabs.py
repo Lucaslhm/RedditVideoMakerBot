@@ -1,4 +1,5 @@
 import random
+import asyncio
 
 from elevenlabs import generate, save
 
@@ -22,7 +23,7 @@ class elevenlabs:
         self.max_chars = 2500
         self.voices = voices
 
-    def run(self, text, filepath, random_voice: bool = False):
+    async def run(self, text, filepath, random_voice: bool = False):
         if random_voice:
             voice = self.randomvoice()
         else:
@@ -35,8 +36,14 @@ class elevenlabs:
                 "You didn't set an Elevenlabs API key! Please set the config variable ELEVENLABS_API_KEY to a valid API key."
             )
 
-        audio = generate(api_key=api_key, text=text, voice=voice, model="eleven_multilingual_v1")
-        save(audio=audio, filename=filepath)
+        loop = asyncio.get_running_loop()
+        
+        audio = await loop.run_in_executor(None, lambda: generate(
+            api_key=api_key, text=text, voice=voice, model="eleven_multilingual_v1"
+        ))
+        
+        await loop.run_in_executor(None, lambda: save(audio=audio, filename=filepath))
+
 
     def randomvoice(self):
         return random.choice(self.voices)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import math
 import sys
+import asyncio
 from os import name
 from pathlib import Path
 from subprocess import Popen
@@ -44,13 +45,25 @@ print_markdown(
 checkversion(__VERSION__)
 
 
-def main(POST_ID=None) -> None:
+async def main_async(POST_ID=None):
     global redditid, reddit_object
     reddit_object = get_subreddit_threads(POST_ID)
     redditid = id(reddit_object)
-    length, number_of_comments = save_text_to_mp3(reddit_object)
+
+    # Await the completion of save_text_to_mp3
+    length, number_of_comments = await save_text_to_mp3(reddit_object)
     length = math.ceil(length)
-    get_screenshots_of_reddit_posts(reddit_object, number_of_comments)
+
+    # Await the completion of get_screenshots_of_reddit_posts
+    await get_screenshots_of_reddit_posts(reddit_object, number_of_comments)
+
+    # Synchronous tasks are called only after the asynchronous tasks have been completed
+    return length, number_of_comments, reddit_object
+
+def main(POST_ID=None):
+    length, number_of_comments, reddit_object = asyncio.run(main_async(POST_ID))
+
+    # Now proceed with synchronous operations
     bg_config = {
         "video": get_background_config("video"),
         "audio": get_background_config("audio"),

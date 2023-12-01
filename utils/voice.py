@@ -1,18 +1,25 @@
 import re
 import sys
+from gpt4all import GPT4All
 import json
+import asyncio
 import time as pytime
 from datetime import datetime
 from time import sleep
 
 from requests import Response
 
+from concurrent.futures import ThreadPoolExecutor
+
 from utils import settings
+from utils.console import print_substep
 from cleantext import clean
 
 if sys.version_info[0] >= 3:
     from datetime import timezone
-
+    
+# Initialize the GPT4All model
+gpt_model = None
 
 def load_text_replacements():
     text_replacements = {}
@@ -22,31 +29,73 @@ def load_text_replacements():
     del text_replacements["__comment"]
     return text_replacements
 
-def perform_text_replacements(text):
+async def perform_text_replacements(text):
     updated_text = text
+    
     for replacement in text_replacements['text-and-audio']:
-        compiled = re.compile(re.escape(replacement[0]), re.IGNORECASE)
+        compiled = re.compile(r'\b' + re.escape(replacement[0]) + r'\b', re.IGNORECASE)  # Added word boundaries
         updated_text = compiled.sub(replacement[1], updated_text)
     for replacement in text_replacements['audio-only']:
-        compiled = re.compile(re.escape(replacement[0]), re.IGNORECASE)
+        compiled = re.compile(r'\b' + re.escape(replacement[0]) + r'\b', re.IGNORECASE)  # Added word boundaries
         updated_text = compiled.sub(replacement[1], updated_text)
+        
+    updated_text = await ai_grammar_smooth(updated_text)
+        
     return updated_text
 
-def check_ratelimit(response: Response) -> bool:
+
+async def ai_grammar_smooth(text):
+    global gpt_model
+    
+    if not settings.config["ai"]["ai_grammar_fix"]:
+        return text
+    elif gpt_model == None:
+        gpt_model = GPT4All(settings.config["ai"]["ai_model"])
+        
+    print("Before AI Enhancement: " + text + "\n")
+    
+    prompt = "Your task is to refine the following text for use in a Text-to-Speech program. This text comes from social media posts and comments and often contains informal language and expressions. Your goal is to correct any grammatical mistakes and improve the natural flow of the language, making it clearer and more suitable for TTS conversion. It's crucial that you do not change the original meaning or add any new content. Focus solely on enhancing the grammar and readability. Here's the text for refinement:"
+
+
+    
+    def synchronous_gpt4all_call(prompt):
+        
+        print("Prompt to AI: " + prompt + "\n")
+        
+        # This is the synchronous function call to GPT4All
+        return gpt_model.generate(prompt=prompt, max_tokens=150)
+
+    async def async_gpt4all_call(prompt):
+        # This function makes the synchronous GPT4All call asynchronously
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(executor, synchronous_gpt4all_call, prompt)
+            
+        print("After AI Enhancement: " + result + "\n")
+        
+        return result
+    
+    result = await async_gpt4all_call((prompt + '"' + text + '"'))
+    
+    
+    return result
+
+
+async def check_ratelimit(response):
     """
-    Checks if the response is a ratelimit response.
+    Checks if the response is a rate limit response.
     If it is, it sleeps for the time specified in the response.
     """
-    if response.status_code == 429:
+    if response.status == 429:
         try:
             time = int(response.headers["X-RateLimit-Reset"])
-            print(f"Ratelimit hit. Sleeping for {time - int(pytime.time())} seconds.")
-            sleep_until(time)
+            print(f"Rate limit hit. Sleeping for {time - int(pytime.time())} seconds.")
+            await asyncio.sleep(max(0, time - pytime.time()))
+            return True
+        except KeyError:
             return False
-        except KeyError:  # if the header is not present, we don't know how long to wait
-            return False
+    return False
 
-    return True
 
 
 def sleep_until(time) -> None:
@@ -84,8 +133,9 @@ def sleep_until(time) -> None:
             sleep(diff / 2)
 
 
-def sanitize_text(text: str) -> str:
-    r"""Sanitizes the text for tts.
+async def sanitize_text(text: str) -> str:
+    """
+    Sanitizes the text for tts.
         What gets removed:
      - following characters`^_~@!&;#:-%“”‘"%*/{}[]()\|<>?=+`
      - any http or https links
@@ -99,7 +149,6 @@ def sanitize_text(text: str) -> str:
 
     # remove any urls from the text
     regex_urls = r"((http|https)\:\/\/)?[a-zA-Z0-9\.\/\?\:@\-_=#]+\.([a-zA-Z]){2,6}([a-zA-Z0-9\.\&\/\?\:@\-_=#])*"
-
     result = re.sub(regex_urls, " ", text)
 
     # note: not removing apostrophes
@@ -110,8 +159,9 @@ def sanitize_text(text: str) -> str:
     # emoji removal if the setting is enabled
     if settings.config["settings"]["tts"]["no_emojis"]:
         result = clean(result, no_emoji=True)
-        
-    result = perform_text_replacements(result)
+
+    # Perform text replacements asynchronously and wait for the result
+    result = await perform_text_replacements(result)
 
     # remove extra whitespace
     return " ".join(result.split())
