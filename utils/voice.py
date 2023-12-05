@@ -25,11 +25,13 @@ def load_text_replacements():
 def perform_text_replacements(text):
     updated_text = text
     for replacement in text_replacements['text-and-audio']:
-        compiled = re.compile(re.escape(replacement[0]), re.IGNORECASE)
+        # Include word boundary markers and ignore case
+        compiled = re.compile(r'\b' + re.escape(replacement[0]) + r'\b', re.IGNORECASE)
         updated_text = compiled.sub(replacement[1], updated_text)
     for replacement in text_replacements['audio-only']:
-        compiled = re.compile(re.escape(replacement[0]), re.IGNORECASE)
-        updated_text = compiled.sub(replacement[1], updated_text)
+        # Include word boundary markers and ignore case
+        compiled = re.compile(r'\b' + re.escape(replacement[0]) + r'\b', re.IGNORECASE)
+        updated_text = compiled.sub(replacement[1], updated_text)        
     return updated_text
 
 def check_ratelimit(response: Response) -> bool:
